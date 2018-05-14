@@ -6,7 +6,7 @@
 
 #include "DS_timer.h"
 
-#define NUM_DATA (512 * 512 * 512)
+#define NUM_DATA (512 * 512 * 256)
 
 __global__ void matAdd(int *a, int *b, int *c)
 {
@@ -21,7 +21,7 @@ __global__ void matAdd(int *a, int *b, int *c)
 int main()
 {
 	// definition
-	int *a, *b, *c;
+	int *a, *b, *c, *d;
 	int *d_a, *d_b, *d_c;
 
 	bool result;
@@ -33,6 +33,7 @@ int main()
 	a = (int *)malloc(sizeof(int) * NUM_DATA);
 	b = (int *)malloc(sizeof(int) * NUM_DATA);
         c = (int *)malloc(sizeof(int) * NUM_DATA);
+        d = (int *)malloc(sizeof(int) * NUM_DATA);
 
 	for(int i = 0; i < NUM_DATA; i++)
 	{
@@ -70,7 +71,7 @@ int main()
 
 	// send result from device to host
 	timer.onTimer(3);
-	cudaMemcpy(c, d_c, sizeof(int) * NUM_DATA, cudaMemcpyDeviceToHost);
+	cudaMemcpy(d, d_c, sizeof(int) * NUM_DATA, cudaMemcpyDeviceToHost);
 	timer.offTimer(3);
 
 
@@ -78,9 +79,9 @@ int main()
 	result = true;
 	for(int i = 0; i < NUM_DATA; i++)
 	{
-		if((a[i] + b[i]) != c[i])
+		if(c[i] != d[i])
 		{
-			printf("[%d] The results is not matchhed! (%d, %d)\n", i, a[i] + b[i], d_c[i]);
+			printf("[%d] The results is not matchhed! (%d, %d)\n", i, c[i], d[i]);
 			result = false;
 		}
 	} 
@@ -93,7 +94,7 @@ int main()
 
 
         cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
-        delete[] a; delete[] b; delete[] c;
+        delete[] a; delete[] b; delete[] c; delete[] d;
 
 	return 0;
 }
