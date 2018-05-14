@@ -28,19 +28,21 @@ int main()
 
 	DS_timer timer(4);
 
+
 	// init
 	a = (int *)malloc(sizeof(int) * NUM_DATA);
 	b = (int *)malloc(sizeof(int) * NUM_DATA);
         c = (int *)malloc(sizeof(int) * NUM_DATA);
-
-	timer.initTimers();
 
 	for(int i = 0; i < NUM_DATA; i++)
 	{
                 a[i] = rand() % 10;
                 b[i] = rand() % 10;
 	}
+	
+	timer.initTimers();
 	// end of init
+
 
 	// serial version
 	timer.onTimer(0);
@@ -48,23 +50,29 @@ int main()
 		c[i] = a[i] + b[i];
 	timer.offTimer(0);	
 
+
 	// cuda version
         cudaMalloc((void **) &d_a, sizeof(int) * NUM_DATA);
         cudaMalloc((void **) &d_b, sizeof(int) * NUM_DATA);
         cudaMalloc((void **) &d_c, sizeof(int) * NUM_DATA);
 
+	// send input data from host to device
 	timer.onTimer(1);
         cudaMemcpy(d_a, a, sizeof(int) * NUM_DATA, cudaMemcpyHostToDevice);
         cudaMemcpy(d_b, b, sizeof(int) * NUM_DATA, cudaMemcpyHostToDevice);
 	timer.offTimer(1);
 
+	// kernel call
 	timer.onTimer(2);
 	matAdd<<<NUM_DATA / 1024, 1024>>>(d_a, d_b, d_c);
+	cudaThreadSynchronize();
 	timer.offTimer(2);
 
+	// send result from device to host
 	timer.onTimer(3);
 	cudaMemcpy(c, d_c, sizeof(int) * NUM_DATA, cudaMemcpyDeviceToHost);
 	timer.offTimer(3);
+
 
 	// check sequence
 	result = true;
@@ -79,8 +87,10 @@ int main()
 
 	if(result)
 		printf("GPU works well!\n");
+
 	
 	timer.printTimer();
+
 
         cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
         delete[] a; delete[] b; delete[] c;
