@@ -26,7 +26,7 @@ __global__ void matMul(double *a, double *b, double *c)
 int main()
 {
 	// definition
-	double *a, *b, *c2, *c1;
+	double *a, *b, *c1, *c2;
 	double *d_a, *d_b, *d_c;
 
 	bool result;
