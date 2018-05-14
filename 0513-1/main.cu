@@ -82,5 +82,10 @@ int main()
 	
 	timer.printTimer();
 
+        cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+        delete[] a;
+        delete[] b;
+        delete[] c;
+
 	return 0;
 }
