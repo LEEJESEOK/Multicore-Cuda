@@ -7,25 +7,29 @@
 #include "DS_timer.h"
 
 #define MATRIX_I (1024)
-#define MATRIX_J (1024 * 128)
+#define MATRIX_J (1024 * 64)
+#define MATRIX_K (1)
 
-/*
-__global__ void matMul(int *a, int *b, int *c)
+__global__ void matMul(double *a, double *b, double *c)
 {
 	const int NUM_THREAD_IN_BLOCK = blockDim.x * blockDim.y * blockDim.z;
 
  	int bID = blockIdx.z * (gridDim.y * gridDim.x * NUM_THREAD_IN_BLOCK) + blockIdx.y * (gridDim.x * NUM_THREAD_IN_BLOCK) + (blockIdx.x * (blockDim.x * blockDim.y * blockDim.z));
 	int tID = bID + ((blockDim.y * blockDim.x) * threadIdx.z) + (blockDim.x * threadIdx.y) + threadIdx.x;
+
 	
-	c[tID] = a[tID] + b[tID];
+	for(int i = 0; i < MATRIX_J; i++)
+		c[tID] += a[(tID * MATRIX_J) + i] * b[i];	
 }
-*/
+
 
 int main()
 {
 	// definition
-	double **a, *b, *c;
-	double **d_a, *d_b, *d_c;
+	double *a, *b, *c2, *c1;
+	double *d_a, *d_b, *d_c;
+
+	bool result;
 
 	DS_timer timer(4);
 
@@ -33,82 +37,77 @@ int main()
 	// init
 	/*
 	a : [MATRIX_I][MATRIX_J]
-	b : [MATRIX_J]
-	c : [MATRIX_I]
+	b : [MATRIX_J] * 1
+	c : [MATRIX_I] * 1
 	*/
-	a = (double **)malloc(sizeof(double *) * MATRIX_I);
-	for(int i = 0; i < MATRIX_I; i++)
-		a[i] = (double *)malloc(sizeof(double) * MATRIX_J);
-	b = (double *)malloc(sizeof(double) * MATRIX_J); 
-	c = (double *)malloc(sizeof(double) * MATRIX_I);
+	a = (double *)malloc(sizeof(double) * MATRIX_I * MATRIX_J);
+	b = (double *)malloc(sizeof(double) * MATRIX_J * MATRIX_K); 
+	c1 = (double *)malloc(sizeof(double) * MATRIX_I * MATRIX_K);
+	c2 = (double *)malloc(sizeof(double) * MATRIX_I * MATRIX_K);
 
-	for(int i = 0; i < MATRIX_I; i++)
-		for(int j = 0; j < MATRIX_J; j++)
-		{
-			a[i][j] = rand() % 100;
-		}
-	for(int i = 0; i < MATRIX_J; i++)
+	for(int i = 0; i < MATRIX_I * MATRIX_J; i++)
+		a[i] = rand() % 100;
+	for(int i = 0; i < MATRIX_J * MATRIX_K; i++)
 		b[i] = rand() % 100;
 	
 	timer.initTimers();
-
 	// end of init
-
+ 
 
 	// serial version
 	timer.onTimer(0);
 	for(int i = 0; i < MATRIX_I; i++)
-	{
-		c[i] = 0;
 		for(int j = 0; j < MATRIX_J; j++)
-		{
-			c[i] += a[i][j] * b[j];
-		}	
-	}
+			c1[i] += a[(i * MATRIX_J) + j] * b[j];
 	timer.offTimer(0);
 
 	// cuda version
-        cudaMalloc((void **) &d_a, sizeof(double) * (MATRIX_I) * (MATRIX_J));
-	cudaMalloc((void **) &d_b, sizeof(double) * MATRIX_J);
-	cudaMalloc((void **) &d_c, sizeof(double) * MATRIX_I);
+        cudaMalloc((void **) &d_a, sizeof(double) * MATRIX_I * MATRIX_J);
+	cudaMalloc((void **) &d_b, sizeof(double) * MATRIX_J * MATRIX_K);
+	cudaMalloc((void **) &d_c, sizeof(double) * MATRIX_I * MATRIX_K);
 
-/*
-	cudaMalloc((void ***) &d_a, sizeof(double *) * MATRIX_I);
-	for(int i = 0; i < MATRIX_I; i++)
-		cudaMalloc((void **) &(d_a[i]), sizeof(double) * MATRIX_J);
-	cudaMalloc((void **) &d_b, sizeof(double) * MATRIX_J);
-	cudaMalloc((void **) &d_c, sizeof(double) * MATRIX_I);
-*/
-/*
+
+	// send input data from host to device
 	timer.onTimer(1);
-	for(int i = 0; i < MATRIX_I; i++)
-		cudaMemcpy(d_a[i], a[i], sizeof(double) * MATRIX_J, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_b, b, sizeof(double) * MATRIX_J, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_a, a, sizeof(double) * MATRIX_I * MATRIX_J, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_b, b, sizeof(double) * MATRIX_J * MATRIX_K, cudaMemcpyHostToDevice);
 	timer.offTimer(1);
 
 
+	dim3 dimGrid(32, 1, 1);
+	dim3 dimBlock(32 ,1 ,1);
 
+	// kernel call
 	timer.onTimer(2);
+	matMul<<<dimGrid, dimBlock>>>(d_a, d_b, d_c);
+	cudaThreadSynchronize();
 	timer.offTimer(2);
 
-
+	// send result from device to host
 	timer.onTimer(3);
-	cudaMemcpy(c, d_c, sizeof(double) * MATRIX_I, cudaMemcpyDeviceToHost);
+	cudaMemcpy(c2, d_c, sizeof(double) * MATRIX_I * MATRIX_K, cudaMemcpyDeviceToHost);
 	timer.offTimer(3);
-*/
+
+	
 	// check sequence
+	result = true;
+	for(int i = 0; i < MATRIX_I; i++)
+		if(c1[i] != c2[i])
+		{
+			printf("[%d] The results is not matched! (%lf, %lf)\n", i, c1[i], c2[i]);
+			result = false;
+		}
 	
+	if(result)
+		printf("GPU works well!\n");
 	
+
 	timer.printTimer();
 
 
 	cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
 
-	for(int i = 0; i < MATRIX_J; i++)
-		delete[] a[i];
-	delete[] a;
-	delete[] b;
-	delete[] c;
+	delete[] a; delete[] b; delete[] c1; delete[] c2;
 
 	return 0;
 }
