@@ -24,8 +24,9 @@ int main()
 	int *a, *b, *c;
 	int *d_a, *d_b, *d_c;
 
-	DS_timer timer(4);
+	bool result;
 
+	DS_timer timer(4);
 
 	// init
 	a = (int *)malloc(sizeof(int) * NUM_DATA);
@@ -65,6 +66,19 @@ int main()
 	cudaMemcpy(c, d_c, sizeof(int) * NUM_DATA, cudaMemcpyDeviceToHost);
 	timer.offTimer(3);
 
+	// check sequence
+	result = true;
+	for(int i = 0; i < NUM_DATA; i++)
+	{
+		if((a[i] + b[i]) != c[i])
+		{
+			printf("[%d] The results is not matchhed! (%d, %d)\n", i, a[i] + b[i], d_c[i]);
+			result = false;
+		}
+	} 
+
+	if(result)
+		printf("GPU works well!\n");
 	
 	timer.printTimer();
 
