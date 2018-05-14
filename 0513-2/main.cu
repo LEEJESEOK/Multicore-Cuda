@@ -101,6 +101,9 @@ int main()
 	
 	timer.printTimer();
 
+
+	cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+
 	for(int i = 0; i < MATRIX_J; i++)
 		delete[] a[i];
 	delete[] a;
