@@ -66,14 +66,20 @@ int main()
 		}	
 	}
 	timer.offTimer(0);
-/*
+
 	// cuda version
+        cudaMalloc((void **) &d_a, sizeof(double) * (MATRIX_I) * (MATRIX_J));
+	cudaMalloc((void **) &d_b, sizeof(double) * MATRIX_J);
+	cudaMalloc((void **) &d_c, sizeof(double) * MATRIX_I);
+
+/*
 	cudaMalloc((void ***) &d_a, sizeof(double *) * MATRIX_I);
 	for(int i = 0; i < MATRIX_I; i++)
 		cudaMalloc((void **) &(d_a[i]), sizeof(double) * MATRIX_J);
 	cudaMalloc((void **) &d_b, sizeof(double) * MATRIX_J);
 	cudaMalloc((void **) &d_c, sizeof(double) * MATRIX_I);
-
+*/
+/*
 	timer.onTimer(1);
 	for(int i = 0; i < MATRIX_I; i++)
 		cudaMemcpy(d_a[i], a[i], sizeof(double) * MATRIX_J, cudaMemcpyHostToDevice);
@@ -94,6 +100,12 @@ int main()
 	
 	
 	timer.printTimer();
+
+	for(int i = 0; i < MATRIX_J; i++)
+		delete[] a[i];
+	delete[] a;
+	delete[] b;
+	delete[] c;
 
 	return 0;
 }
