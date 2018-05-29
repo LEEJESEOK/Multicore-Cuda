@@ -12,24 +12,24 @@ void printMat(float *mat, int size_i, int isze_j);
 //__global__ void matMul(float *a, float *b, float *c, int size_i, int size_j, int size_k)
 __global__ void matMul(float *a, float *b, float *c, int M, int N, int K)
 {
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
-	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int row = blockIdx.x * blockDim.x + threadIdx.x;
+	int col = blockIdx.y * blockDim.y + threadIdx.y;
 
-	if(row > M || col > N)
+	if(row >= M || col >= N)
 		return;
 	
 	float sum = 0.f;
 
-	__syncthreads();
+//	__syncthreads();
 
 	for(int k = 0; k < K; k++)
 	{
-		sum += a[row * K + k] * b[k * N + col];
+		sum += a[col * K + k] * b[k * N + row];
 	}
 
-	__syncthreads();
+//	__syncthreads();
 
-	c[row * N + col] = sum;
+	c[col * N + row] = sum;
 }
 
 int main()
