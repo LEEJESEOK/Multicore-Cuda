@@ -75,7 +75,7 @@ int main()
 
 
 	dim3 dimGrid(32, 1, 1);
-	dim3 dimBlock(32 ,1 ,1);
+	dim3 dimBlock(32, 1, 1);
 
 	// kernel call
 	timer.onTimer(2);

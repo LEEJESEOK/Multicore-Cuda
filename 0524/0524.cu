@@ -20,14 +20,14 @@ __global__ void matMul(float *a, float *b, float *c, int M, int N, int K)
 	
 	float sum = 0.f;
 
-//	__syncthreads();
+	__syncthreads();
 
 	for(int k = 0; k < K; k++)
 	{
 		sum += a[col * K + k] * b[k * N + row];
 	}
 
-//	__syncthreads();
+	__syncthreads();
 
 	c[col * N + row] = sum;
 }
