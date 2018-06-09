@@ -97,10 +97,14 @@ int main()
 	cudaMemcpy(c, d_c, sizeof(int) * DATA_RANGE, cudaMemcpyDeviceToHost);
 	printHist(c, (char *) "Shared Sync");
 	
+
 	timer.printTimer();
+
 
 	free(arr);
 	free(a); free(b);
+
+	cudaFree(d_arr); cudaFree(d_b); cudaFree(d_c);
 
 	return 0;
 }
