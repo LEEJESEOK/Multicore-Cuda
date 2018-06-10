@@ -11,20 +11,20 @@
 
 void printHist(int * arr, char * str);
 
-__global__ void histogram_atomic(int * a, int * histo, int n) {
+__global__ void histogram_atomic(float * a, int * histo, int n) {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	if(tid >= n) return;
-	atomicAdd(histo + a[tid], 1);
+	atomicAdd(histo + (int)a[tid], 1);
 }
 
-__global__ void histogram_shared(int * a, int * histo, int n) {
+__global__ void histogram_shared(float * a, int * histo, int n) {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	__shared__ int sh[DATA_RANGE];
 
 	if(threadIdx.x < 256) sh[threadIdx.x] = 0;
 	__syncthreads();
 	
-	if(tid < n) atomicAdd(&sh[a[tid]], 1);
+	if(tid < n) atomicAdd(&sh[(int)a[tid]], 1);
 	__syncthreads();
 
 	if(threadIdx.x < 256) atomicAdd(&histo[threadIdx.x], sh[threadIdx.x]);	
@@ -34,14 +34,14 @@ __global__ void histogram_shared(int * a, int * histo, int n) {
 
 int main()
 {
-	int * arr, * d_arr;
+	float * arr, * d_arr;
 	int * a, * b, * c;
 	int * d_b, *d_c;
 	
 	DS_timer timer(3);
 
 
-	arr = (int *) malloc(sizeof(int) * DATA_SIZE);
+	arr = (float *) malloc(sizeof(float) * DATA_SIZE);
 
 	a = (int *) malloc(sizeof(int) * DATA_RANGE);
 	b = (int *) malloc(sizeof(int) * DATA_RANGE);
@@ -66,10 +66,10 @@ int main()
 
 	
 	// Global Sync version
-	cudaMalloc((void **)&d_arr, sizeof(int) * DATA_SIZE);
+	cudaMalloc((void **)&d_arr, sizeof(float) * DATA_SIZE);
 	cudaMalloc((void **)&d_b, sizeof(int) * DATA_RANGE);
 
-	cudaMemcpy(d_arr, arr, sizeof(int) * DATA_SIZE, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_arr, arr, sizeof(float) * DATA_SIZE, cudaMemcpyHostToDevice);
 
 	cudaMemset(d_b, 0, sizeof(int) * DATA_RANGE);
 	
