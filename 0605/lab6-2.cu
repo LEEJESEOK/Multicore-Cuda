@@ -66,13 +66,79 @@ __global__ void trap_kernel_s2(float a, float b, float h, int n, float * sum)
 
 }
 
+__global__ void trap_kernel_s3(float a, float b, float h, int n, float * sum)
+{
+	int tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(tID >= n - 1) return;
+	
+	__shared__ float localVal[64];
+	localVal[blockDim.x] = 0;
+
+	float x_i = a + h * tID;
+	float x_j = a + h * (tID + 1);
+	float d = (f(x_i) + f(x_j)) / 2.0;
+
+	localVal[blockDim.x] = d * h;
+	__syncthreads();
+
+	// reduction
+	int offset = 1;
+	while(offset < blockDim.x)
+	{
+		if(threadIdx.x % (2 * offset) == 0)
+			localVal[threadIdx.x] += localVal[threadIdx.x + offset];
+
+		__syncthreads();
+		offset *= 2;
+	}
+
+	if(threadIdx.x == 0)
+		atomicAdd(sum, localVal[0]);
+}
+
+__global__ void trap_kernel_s4(float a, float b, float h, int n, float * sum)
+{
+	int tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(tID >= n - 1) return;
+	
+	__shared__ float localVal[64];
+	localVal[blockDim.x] = 0;
+
+	float x_i = a + h * tID;
+	float x_j = a + h * (tID + 1);
+	float d = (f(x_i) + f(x_j)) / 2.0;
+
+	localVal[blockDim.x] = d * h;
+	__syncthreads();
+
+	// reduction
+	int offset = blockDim.x / 2;
+	
+	while(offset > 0)
+	{
+		if(threadIdx.x < offset)
+			localVal[threadIdx.x] += localVal[threadIdx.x + offset];
+
+		offset /= 2;
+
+		__syncthreads();
+	}
+
+	if(threadIdx.x == 0)
+		atomicAdd(sum, localVal[0]);
+
+
+}
+
 int main()
 {
 	float a, b, h;
 	int n;
    	float sum = 0, * cuda_sum, * d_sum;
 
-	DS_timer timer(4);
+	DS_timer timer(6);
 	timer.initTimers();
 
 	printf("a > ");
@@ -125,6 +191,8 @@ int main()
 	cudaThreadSynchronize();
 	timer.offTimer(2);
 	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+	printf("\tShared v1 sum : %f\n", *cuda_sum);	
+
 
 
 	// Shared ver2
@@ -136,8 +204,35 @@ int main()
 	cudaThreadSynchronize();
 	timer.offTimer(3);
 	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+	printf("\tShared v2 sum : %f\n", *cuda_sum);	
 
-	printf("\tCUDA sum : %f\n", *cuda_sum);	
+
+
+	// Reduction 1
+	cudaMemset(d_sum, 0, sizeof(float));
+	
+	timer.setTimerName(4, (char *)"Reduction Ver1");
+	timer.onTimer(4);
+	trap_kernel_s3<<<dimGrid, dimBlock>>>(a, b, h, n, d_sum);
+	cudaThreadSynchronize();
+	timer.offTimer(4);
+	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+	printf("\tReduction1 sum : %f\n", *cuda_sum);	
+
+
+
+	// Reduction 2
+	cudaMemset(d_sum, 0, sizeof(float));
+	
+	timer.setTimerName(5, (char *)"Reduction Ver2");
+	timer.onTimer(5);
+	trap_kernel_s4<<<dimGrid, dimBlock>>>(a, b, h, n, d_sum);
+	cudaThreadSynchronize();
+	timer.offTimer(5);
+	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+	printf("\tReduction2 sum : %f\n", *cuda_sum);	
+
+
 
 
 	timer.printTimer();
