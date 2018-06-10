@@ -9,59 +9,136 @@
 #define f(x) ((x) * (x))
 
 
-__global__ void trap_kernel(double a, double b, double h, int n, double * sum)
+__global__ void trap_kernel(float a, float b, float h, int n, float * sum)
 {
-	const int NUM_THREAD_IN_BLOCK = blockDim.x * blockDim.y * blockDim.z;
-
-	int bID = blockIdx.z * (gridDim.y * gridDim.x * NUM_THREAD_IN_BLOCK) + blockIdx.y * (gridDim.x * NUM_THREAD_IN_BLOCK) + (blockIdx.x * (blockDim.x * blockDim.y * blockDim.z));
-	int tID = bID + ((blockDim.y * blockDim.x) * threadIdx.z) + (blockDim.x * threadIdx.y) + threadIdx.x;
+	int tID = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(tID >= n - 1) return;
+	
+	float x_i = a + h * tID;
+	float x_j = a + h * (tID + 1);
+	float d = (f(x_i) + f(x_j)) / 2.0;
 
-
-//	atomicAdd(sum, d * h);
+	atomicAdd(sum, d * h);
 }
 
+__global__ void trap_kernel_s1(float a, float b, float h, int n, float * sum)
+{
+	int tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(tID >= n - 1) return;
+	
+	__shared__ float localSum;
+
+	float x_i = a + h * tID;
+	float x_j = a + h * (tID + 1);
+	float d = (f(x_i) + f(x_j)) / 2.0;
+
+	atomicAdd(&localSum, d * h);
+	__syncthreads();
+
+	if(threadIdx.x == 0) atomicAdd(sum, localSum);
+}
+
+__global__ void trap_kernel_s2(float a, float b, float h, int n, float * sum)
+{
+	int tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(tID >= n - 1) return;
+	
+	__shared__ float localVal[64];
+	localVal[blockDim.x] = 0;
+
+	float x_i = a + h * tID;
+	float x_j = a + h * (tID + 1);
+	float d = (f(x_i) + f(x_j)) / 2.0;
+
+	localVal[blockDim.x] = d * h;
+	__syncthreads();
+
+	if(threadIdx.x == 0)
+	{
+		for(int i = 1; i < blockDim.x; i++)
+			localVal[0] += localVal[i];
+
+		atomicAdd(sum, localVal[0]);
+	}
+
+}
 
 int main()
 {
-	double a, b, h;
+	float a, b, h;
 	int n;
-   	double sum = 0, * d_sum;
+   	float sum = 0, * cuda_sum, * d_sum;
 
-	DS_timer timer(2);
+	DS_timer timer(4);
 	timer.initTimers();
 
 	printf("a > ");
-	scanf("%d", &a);
+	scanf("%f", &a);
 	printf("b > ");
-	scanf("%d", &b);
+	scanf("%f", &b);
 	printf("n > ");
 	scanf("%d", &n);
 
-	h = (b - a) / (double) N;
+	h = (b - a) / (float) n;
 
 	// CPU version
+	timer.setTimerName(0, (char *)"CPU");
 	timer.onTimer(0);
-	for(int i = 0; i < N - 1; i++)
+	for(int i = 0; i < n - 1; i++)
 	{
-		double x_i = a + h * i;
-		double x_j = a + h * (i + 1);
-		double d = (f(x_i) + f(x_j)) / 2.0;
+		float x_i = a + h * i;
+		float x_j = a + h * (i + 1);
+		float d = (f(x_i) + f(x_j)) / 2.0;
 		sum += d * h;
 	}
 	timer.offTimer(0);
-	printf("\tCPU sum : %lf\n", sum);
+	printf("\tCPU sum : %f\n", sum);
 
 	// CUDA version
+	cuda_sum = (float *)malloc(sizeof(float));
+	cudaMalloc((void **)&d_sum, sizeof(float));
+	cudaMemset(d_sum, 0, sizeof(float));
 
-	cudaMalloc((void **)&d_sum, sizeof(double));
-
-	dim3 dimGrid(N / 64, 1, 1);
+	dim3 dimGrid(n / 64, 1, 1);
 	dim3 dimBlock(64, 1, 1);
+
+	// Global Sync
+	timer.setTimerName(1, (char *)"Global Sync");
+	
 	timer.onTimer(1);
-	trap_kernel<<<dimGrid, dimBlock>>>(a, b, h, n, &d_sum);
+	trap_kernel<<<dimGrid, dimBlock>>>(a, b, h, n, d_sum);
+	cudaThreadSynchronize();
 	timer.offTimer(1);
+	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+	printf("\tCUDA sum : %f\n", *cuda_sum);	
+
+
+	// Shared ver1
+	cudaMemset(d_sum, 0, sizeof(float));
+	
+	timer.setTimerName(2, (char *)"Shared Ver1");
+	timer.onTimer(2);
+	trap_kernel_s1<<<dimGrid, dimBlock>>>(a, b, h, n, d_sum);
+	cudaThreadSynchronize();
+	timer.offTimer(2);
+	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+
+
+	// Shared ver2
+	cudaMemset(d_sum, 0, sizeof(float));
+	
+	timer.setTimerName(3, (char *)"Shared Ver2");
+	timer.onTimer(3);
+	trap_kernel_s2<<<dimGrid, dimBlock>>>(a, b, h, n, d_sum);
+	cudaThreadSynchronize();
+	timer.offTimer(3);
+	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+
+	printf("\tCUDA sum : %f\n", *cuda_sum);	
+
 
 	timer.printTimer();
 
