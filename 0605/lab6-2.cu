@@ -238,5 +238,6 @@ int main()
 
 	timer.printTimer();
 
+	free(cuda_sum);
 	cudaFree(d_sum);
 }
