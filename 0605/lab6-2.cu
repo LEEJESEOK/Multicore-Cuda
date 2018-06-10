@@ -139,6 +139,8 @@ int main()
    	float sum = 0, * cuda_sum, * d_sum;
 
 	DS_timer timer(6);
+	
+	// init
 	timer.initTimers();
 
 	printf("a > ");
@@ -162,6 +164,7 @@ int main()
 	}
 	timer.offTimer(0);
 	printf("\tCPU sum : %f\n", sum);
+	// end of CPU version
 
 	// CUDA version
 	cuda_sum = (float *)malloc(sizeof(float));
@@ -170,6 +173,7 @@ int main()
 
 	dim3 dimGrid(n / 64, 1, 1);
 	dim3 dimBlock(64, 1, 1);
+
 
 	// Global Sync
 	timer.setTimerName(1, (char *)"Global Sync");
@@ -194,7 +198,6 @@ int main()
 	printf("\tShared v1 sum : %f\n", *cuda_sum);	
 
 
-
 	// Shared ver2
 	cudaMemset(d_sum, 0, sizeof(float));
 	
@@ -205,7 +208,6 @@ int main()
 	timer.offTimer(3);
 	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
 	printf("\tShared v2 sum : %f\n", *cuda_sum);	
-
 
 
 	// Reduction 1
@@ -220,7 +222,6 @@ int main()
 	printf("\tReduction1 sum : %f\n", *cuda_sum);	
 
 
-
 	// Reduction 2
 	cudaMemset(d_sum, 0, sizeof(float));
 	
@@ -231,8 +232,8 @@ int main()
 	timer.offTimer(5);
 	cudaMemcpy(cuda_sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
 	printf("\tReduction2 sum : %f\n", *cuda_sum);	
-
-
+	
+	// end of CUDA version
 
 
 	timer.printTimer();
